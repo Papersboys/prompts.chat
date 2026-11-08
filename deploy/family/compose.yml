@@ -1,0 +1,57 @@
+name: family-prompts
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    mem_limit: 256m
+    environment:
+      POSTGRES_USER: prompts
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a generated database password}
+      POSTGRES_DB: prompts
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U prompts -d prompts]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    logging:
+      options:
+        max-size: 10m
+        max-file: '3'
+  app:
+    image: ${PROMPTS_IMAGE:?Set the tested ghcr.io/f/prompts.chat image digest}
+    restart: unless-stopped
+    mem_limit: ${APP_MEMORY_LIMIT:-1280m}
+    ports:
+      - 127.0.0.1:4444:3000
+    environment:
+      DATABASE_URL: postgresql://prompts:${POSTGRES_PASSWORD}@db:5432/prompts?schema=public
+      DIRECT_URL: postgresql://prompts:${POSTGRES_PASSWORD}@db:5432/prompts?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:?Set a generated session secret}
+      AUTH_URL: https://prompts.li-family.us
+      AUTH_TRUST_HOST: 'true'
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: '1'
+      PCHAT_NAME: Li Family Prompts
+      PCHAT_DESCRIPTION: Our family prompt library
+      PCHAT_AUTH_PROVIDERS: credentials
+      # The entire site, including registration and APIs, is behind per-person
+      # nginx access credentials. Invited people then create their app account.
+      PCHAT_ALLOW_REGISTRATION: 'true'
+      PCHAT_LOCALES: en,zh
+      PCHAT_DEFAULT_LOCALE: en
+      PCHAT_FEATURE_PRIVATE_PROMPTS: 'true'
+      PCHAT_FEATURE_AI_SEARCH: 'false'
+      PCHAT_FEATURE_AI_GENERATION: 'false'
+      PCHAT_FEATURE_PROMPT_ENHANCER: 'false'
+      PCHAT_FEATURE_MCP: 'false'
+    depends_on:
+      db:
+        condition: service_healthy
+    logging:
+      options:
+        max-size: 10m
+        max-file: '3'
+volumes:
+  postgres_data:
